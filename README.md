@@ -9,7 +9,7 @@ Con `FIREBASE_CONFIG = null` (como viene), la web funciona en **modo demo**: tod
 1. Subí `index.html` a un repositorio de GitHub.
 2. En el repo: **Settings → Pages → Branch: main / (root) → Save**.
 3. Abrí la URL que te da GitHub (`https://TU-USUARIO.github.io/TU-REPO/`).
-4. En una pestaña tocá **"Soy vendedor"**, cargá tus datos, guardá, habilitate en Administración y activá el interruptor.
+4. En una pestaña abrí la web con `#panel-cs` al final de la dirección, cargá tus datos, guardá, habilitate en Administración y activá el interruptor.
 5. En otra pestaña hacé de comprador. Los pedidos aparecen en la pestaña del vendedor.
 
 > En modo demo cada navegador tiene sus propios datos: no sirve para probar entre varios celulares.
@@ -25,7 +25,9 @@ Con `FIREBASE_CONFIG = null` (como viene), la web funciona en **modo demo**: tod
 7. En **Firestore → Rules**, pegá el contenido de `firestore.rules` (con tu email) y publicá.
 8. Subí el `index.html` actualizado a GitHub.
 
-Cada vendedor entra con **"Soy vendedor" → Ingresar con Google**, carga sus datos, y el administrador lo habilita.
+Cada vendedor entra con la dirección de la web + `#panel-cs` → **Ingresar con Google**, carga sus datos, y el administrador lo habilita.
+
+Antes de usarla con Firebase, poné `MODO_PRUEBA = false` en `index.html`: el vendedor ficticio no funciona con las reglas de seguridad de Firebase.
 
 ## Notas
 

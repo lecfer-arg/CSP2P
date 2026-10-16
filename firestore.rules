@@ -25,12 +25,18 @@ service cloud.firestore {
       allow read: if true;
       allow create: if request.resource.data.estado == 'pendiente';
       allow update: if request.auth != null && request.auth.uid == resource.data.vendedorId;
+      // El comprador (sin cuenta) puede reemplazar una factura vencida, sin tocar nada más del pedido.
+      allow update: if resource.data.estado == 'vencida'
+                    && request.resource.data.estado == 'recibido'
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['invoice', 'estado', 'factura_nueva_at'])
+                    && request.resource.data.invoice is string
+                    && request.resource.data.invoice.size() < 2000;
       // El comprador (sin cuenta) solo puede agregar UN comentario corto a una orden completada.
       allow update: if resource.data.estado == 'completada'
                     && !('comentario' in resource.data)
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comentario', 'comentario_at'])
                     && request.resource.data.comentario is string
-                    && request.resource.data.comentario.size() <= 100;
+                    && request.resource.data.comentario.size() <= 50;
     }
 
     // Contador de códigos y turno de la rotación.
