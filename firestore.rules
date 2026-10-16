@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Reemplazá por el/los email(s) de administrador (los mismos que en ADMIN_EMAILS del index.html)
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email in ['tu-email@gmail.com'];
+    }
+
+    // Cada vendedor solo puede editar su propio perfil. Todos pueden leerlos (la web necesita los datos de cobro).
+    match /vendedores/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Solo el administrador habilita vendedores.
+    match /autorizados/{uid} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Los compradores (sin cuenta) crean operaciones pendientes.
+    // Solo el vendedor asignado puede cambiar su estado.
+    match /transacciones/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.estado == 'pendiente';
+      allow update: if request.auth != null && request.auth.uid == resource.data.vendedorId;
+    }
+
+    // Contador de códigos y turno de la rotación.
+    match /meta/{docId} {
+      allow read: if true;
+      allow write: if docId in ['contador', 'turno'];
+    }
+  }
+}

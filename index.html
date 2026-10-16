@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Club Satoshi · Comprá tus primeros sats</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --ink: #000000;
+    --muted: #6b6b6b;
+    --line: #e6e6e6;
+    --soft: #f6f6f6;
+    --orange: #f7931a;
+    --orange-ink: #b35f00;
+    --ok: #1f8a4c;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #ffffff; --ink: #000000; --muted: #6b6b6b; --line: #e6e6e6; --soft: #f6f6f6;
+    }
+  }
+  :root[data-theme="dark"] { --bg: #ffffff; --ink: #000000; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  *, *::before, *::after { box-sizing: inherit; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .display { font-family: "Bricolage Grotesque", "Inter", system-ui, sans-serif; }
+
+  header {
+    max-width: 560px; margin: 0 auto; padding: 20px 20px 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; color: var(--ink); }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--orange);
+    display: grid; place-items: center; font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 18px;
+  }
+  .rate { font-size: 13px; color: var(--muted); }
+  .header-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .online { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); font-weight: 500; }
+  .online::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #1fbf5f; box-shadow: 0 0 0 3px rgba(31,191,95,.18); }
+  .online.off { color: var(--muted); }
+  .online.off::before { background: #c4c4c4; box-shadow: none; }
+
+  main { max-width: 560px; margin: 0 auto; padding: 48px 20px 40px; }
+  .screen { display: none; }
+  .screen.active { display: block; animation: in .35s ease; }
+  @keyframes in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .screen.active { animation: none; } }
+
+  h1 { font-size: clamp(30px, 7vw, 44px); line-height: 1.05; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 32px; text-align: center; }
+
+  .amount-wrap {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    border-bottom: 3px solid var(--ink); max-width: 260px; margin: 0 auto 8px; padding-bottom: 4px;
+  }
+  .amount-wrap:focus-within { border-color: var(--orange); }
+  .amount-wrap span { font-family: "Bricolage Grotesque", sans-serif; font-size: 48px; font-weight: 600; }
+  #amount {
+    width: 120px; border: 0; outline: 0; background: transparent; color: var(--ink);
+    font-family: "Bricolage Grotesque", sans-serif; font-size: 64px; font-weight: 800; text-align: center;
+    -moz-appearance: textfield;
+  }
+  #amount::-webkit-outer-spin-button, #amount::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .hint { text-align: center; font-size: 13px; color: var(--muted); margin: 0 0 22px; min-height: 20px; }
+  .hint.err { color: #c0392b; }
+
+  .chips { display: flex; flex-wrap: nowrap; justify-content: center; gap: 6px; margin-bottom: 36px; }
+  .chip {
+    flex: 0 1 34px; min-width: 0; height: 30px;
+    border: 1.5px solid var(--line); background: var(--bg); color: #cccccc; border-radius: 8px;
+    padding: 0; font: 600 13px "Inter", sans-serif; cursor: pointer; transition: border-color .15s, background .15s, color .15s;
+  }
+  .chip:hover { border-color: #cccccc; color: #999999; }
+  .chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  .result { text-align: center; margin-bottom: 32px; }
+  .sats { font-family: "Bricolage Grotesque", sans-serif; font-size: clamp(40px, 11vw, 64px); font-weight: 800; color: var(--orange); line-height: 1; letter-spacing: -0.02em; }
+  .sats small { font-size: 0.4em; font-weight: 600; color: var(--ink); margin-left: 6px; letter-spacing: 0; }
+  .countdown { text-align: center; font-size: 13px; color: var(--muted); margin: 0 0 10px; font-variant-numeric: tabular-nums; }
+  .countdown b { color: var(--ink); font-weight: 600; }
+  .eyebrow { text-align: center; color: var(--muted); font-size: 14px; margin: 0 0 10px; }
+  .receive-label { margin: 0 0 6px; color: var(--muted); font-size: 15px; }
+  .pay-options { margin-top: 22px; font-size: 15px; color: var(--muted); }
+  .pay-options > p { margin: 0 0 12px; }
+  .pay-split { display: flex; justify-content: center; align-items: stretch; }
+  .pay-col { flex: 1; max-width: 170px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 12px; }
+  .pay-divider { width: 1px; background: var(--line); }
+  .pay-amount { display: flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 600; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .flag { width: 22px; height: 15px; border-radius: 2px; box-shadow: 0 0 0 1px var(--line); flex-shrink: 0; }
+  .pay-col small { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
+
+  .btn {
+    display: block; width: 100%; border: 0; border-radius: 14px; padding: 18px;
+    font: 600 18px "Inter", sans-serif; cursor: pointer; background: var(--orange); color: var(--ink);
+    transition: transform .1s, filter .15s;
+  }
+  .btn:hover { filter: brightness(1.05); }
+  .btn:active { transform: scale(.99); }
+  .btn:disabled { background: var(--line); color: var(--muted); cursor: not-allowed; }
+  .btn.dark { background: var(--ink); color: #fff; }
+  .link { background: none; border: 0; color: var(--muted); font: 500 15px "Inter", sans-serif; cursor: pointer; padding: 12px; display: block; margin: 8px auto 0; }
+  .link:hover { color: var(--ink); }
+  :focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+
+  h2 { font-size: clamp(26px, 6vw, 34px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin: 0 0 8px; }
+  .sub { color: var(--muted); margin: 0 0 28px; }
+
+  .field { margin-bottom: 28px; }
+  .field label { display: block; font-weight: 600; margin-bottom: 6px; }
+  .field p { margin: 0 0 10px; font-size: 14px; color: var(--muted); }
+  .field input {
+    width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 14px;
+    font: 15px "Inter", sans-serif; color: var(--ink); background: var(--bg);
+  }
+  .field input:focus { border-color: var(--ink); outline: 0; }
+  .field textarea {
+    width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 14px; resize: vertical;
+    font: 14px ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--ink); background: var(--bg); word-break: break-all;
+  }
+  .field textarea:focus { border-color: var(--ink); outline: 0; }
+  .field textarea.bad { border-color: #c0392b; }
+  .inv-err { color: #c0392b !important; font-size: 13px; margin: 8px 0 0 !important; min-height: 1em; }
+
+  .methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .method {
+    border: 1.5px solid var(--line); border-radius: 14px; padding: 16px; text-align: left; cursor: pointer;
+    background: var(--bg); color: var(--ink); font: inherit;
+  }
+  .method strong { display: block; font-size: 17px; }
+  .method span { font-size: 13px; color: var(--muted); }
+  .method.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+
+  .paybox { background: var(--soft); border-radius: 16px; padding: 20px; margin-bottom: 24px; }
+  .paybox .total { font-size: 15px; color: var(--muted); margin-bottom: 14px; }
+  .paybox .total b { font-family: "Bricolage Grotesque", sans-serif; font-size: 28px; color: var(--ink); display: block; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .row div { min-width: 0; }
+  .row small { display: block; font-size: 12px; color: var(--muted); }
+  .row code { font: 500 15px "Inter", sans-serif; word-break: break-all; }
+  .copy {
+    flex-shrink: 0; border: 1.5px solid var(--ink); background: var(--bg); color: var(--ink); border-radius: 10px;
+    padding: 6px 12px; font: 600 13px "Inter", sans-serif; cursor: pointer;
+  }
+  .copy.done { background: var(--ink); color: #fff; }
+  .warn { font-size: 13px; color: var(--orange-ink); margin: 12px 0 0; }
+
+  .opcode span[hidden] { display: none; }
+  .thanks { margin-top: 28px; }
+  .thanks[hidden] { display: none; }
+  .thanks p { color: var(--muted); font-size: 15px; margin: 0 0 14px; }
+  .socials { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+  .social { border: 1.5px solid var(--ink); border-radius: 999px; padding: 8px 18px; font-weight: 600; font-size: 14px; color: var(--ink); text-decoration: none; }
+  .social:hover { background: var(--ink); color: #fff; }
+  .status { text-align: center; padding-top: 12px; }
+  .opcode { display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1.5px dashed var(--ink); border-radius: 14px; padding: 16px; margin: 0 auto 8px; max-width: 320px; }
+  .opcode small { font-size: 13px; color: var(--muted); }
+  .opcode b { font-family: "Bricolage Grotesque", sans-serif; font-size: 36px; font-weight: 800; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+  .opcode span { font-size: 13px; color: var(--muted); }
+  .spinner {
+    width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 24px;
+    border: 5px solid var(--line); border-top-color: var(--orange); animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .check { width: 64px; height: 64px; border-radius: 50%; background: var(--orange); margin: 0 auto 24px; display: grid; place-items: center; font-size: 32px; font-weight: 800; }
+  .steps { list-style: none; padding: 0; margin: 28px 0; text-align: left; }
+  .steps li { display: flex; gap: 12px; align-items: center; padding: 10px 0; color: var(--muted); }
+  .steps li .dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); flex-shrink: 0; display: grid; place-items: center; font-size: 12px; }
+  .steps li.done { color: var(--ink); }
+  .steps li.done .dot { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .steps li.now { color: var(--ink); font-weight: 600; }
+  .steps li.now .dot { border-color: var(--orange); }
+
+  .history { margin-top: 40px; }
+  .history h3 { font-size: 18px; font-weight: 800; margin: 0 0 8px; }
+  .tx { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: baseline; padding: 12px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  .tx-code { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tx-date { color: var(--muted); font-size: 14px; }
+  .tx-sats { font-weight: 600; color: var(--orange-ink); font-variant-numeric: tabular-nums; text-align: right; }
+  .tx-empty { color: var(--muted); font-size: 14px; padding: 12px 0; border-top: 1px solid var(--line); margin: 0; }
+  .more { margin-top: 4px; }
+
+  .faq { max-width: 560px; margin: 0 auto; padding: 32px 20px 24px; border-top: 1px solid var(--line); }
+  .faq h3 { font-size: 22px; font-weight: 800; margin: 0 0 12px; }
+  details { border-bottom: 1px solid var(--line); }
+  summary { cursor: pointer; padding: 16px 0; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; font-size: 20px; line-height: 1; color: var(--orange); }
+  details[open] summary::after { content: "–"; }
+  details p { margin: 0 0 16px; color: var(--muted); }
+  footer { max-width: 560px; margin: 0 auto; padding: 24px 20px 40px; font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+  footer .brand-mark { width: 26px; height: 26px; font-size: 14px; }
+
+  /* ===== PANEL DE VENDEDORES ===== */
+  .seller-link { background: none; border: 0; color: var(--muted); font: 500 14px "Inter", sans-serif; text-decoration: underline; cursor: pointer; padding: 0; margin-left: auto; flex-shrink: 0; }
+  .seller-link:hover { color: var(--ink); }
+  body.seller-mode .faq { display: none; }
+  .panel h2 { margin-bottom: 4px; }
+  .card { border: 1.5px solid var(--line); border-radius: 16px; padding: 18px; margin-bottom: 16px; }
+  .card h3 { font-size: 17px; font-weight: 800; margin: 0 0 4px; }
+  .card > p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+  .notice { background: var(--soft); border-radius: 12px; padding: 14px; font-size: 14px; margin-bottom: 16px; }
+  .notice[hidden] { display: none; }
+  .notice code { word-break: break-all; font-size: 12px; }
+  .status-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .status-card .st { font-weight: 700; font-size: 17px; }
+  .status-card .st-sub { font-size: 13px; color: var(--muted); }
+  .st-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; background: #c4c4c4; vertical-align: middle; }
+  .st-dot.on { background: #1fbf5f; box-shadow: 0 0 0 3px rgba(31,191,95,.18); }
+  .switch { position: relative; width: 56px; height: 32px; flex-shrink: 0; display: block; }
+  .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; position: absolute; inset: 0; z-index: 1; }
+  .switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--line); transition: background .2s; }
+  .switch span::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+  .switch input:checked + span { background: var(--ink); }
+  .switch input:checked + span::after { transform: translateX(24px); }
+  .switch input:focus-visible + span { outline: 3px solid var(--orange); outline-offset: 2px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card .field { margin-bottom: 14px; }
+  .card .field input { padding: 12px; }
+  .card .field small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .liq-meta { font-size: 13px; color: var(--muted); margin: -6px 0 0; }
+  .form-msg { font-size: 13px; margin: 10px 0 0; min-height: 1em; text-align: center; }
+  .form-msg.ok { color: var(--ok); }
+  .form-msg.err { color: #c0392b; }
+  .order { border: 1.5px solid var(--ink); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+  .order.new { animation: pulse 1.2s ease 3; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(247,147,26,.35); } }
+  @media (prefers-reduced-motion: reduce) { .order.new { animation: none; } }
+  .order-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  .order-head b { font-family: "Bricolage Grotesque", sans-serif; font-size: 22px; }
+  .order-head span { font-size: 13px; color: var(--muted); }
+  .order p { margin: 0 0 6px; font-size: 15px; }
+  .order .tag { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 2px 10px; background: var(--soft); margin-bottom: 10px; }
+  .order .tag.go { background: #fff1de; color: var(--orange-ink); }
+  .order .inv { background: var(--soft); border-radius: 10px; padding: 10px; font: 12px ui-monospace, Menlo, Consolas, monospace; word-break: break-all; margin: 8px 0; max-height: 96px; overflow: auto; }
+  .order .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .order .btn { padding: 14px; font-size: 16px; }
+  .btn.ghost { background: var(--bg); color: #c0392b; border: 1.5px solid #f0c8c3; }
+  .alert-bar { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 12px); z-index: 10; width: max-content; max-width: calc(100% - 24px); background: var(--ink); color: #fff; border-radius: 16px; padding: 10px 18px; font-weight: 600; font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.2); }
+  .alert-bar[hidden] { display: none; }
+  .mini-list .tx:first-of-type { border-top: 0; }
+  .admin-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .admin-row:first-child { border-top: 0; }
+  .admin-row small { display: block; color: var(--muted); font-size: 12px; word-break: break-all; }
+  @media (max-width: 380px) { .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="brand" href="#" onclick="goBuyer();return false;">
+    <span class="brand-mark">₿</span> Club Satoshi
+  </a>
+  <div class="header-meta">
+    <span class="rate" id="rateLabel"></span>
+    <span class="online" id="onlineLabel"></span>
+  </div>
+</header>
+
+<main>
+  <!-- PANTALLA 1: MONTO -->
+  <section class="screen active" id="s-amount">
+    <p class="eyebrow">Paso a paso, satoshi a satoshi</p>
+    <h1 class="display">¿Cuántos Satoshis vas a acumular hoy?</h1>
+
+    <div class="amount-wrap">
+      <span>US$</span>
+      <input id="amount" type="number" inputmode="numeric" min="1" max="10" step="1" value="1" aria-label="Monto en dólares, de 1 a 10">
+    </div>
+    <p class="hint" id="hint">Entre 1 y 10 dólares</p>
+
+    <div class="chips" id="chips"></div>
+
+    <div class="result" aria-live="polite">
+      <p class="receive-label">Vas a recibir</p>
+      <div class="sats"><span id="satsOut">0</span><small>sats</small></div>
+      <div class="pay-options">
+        <p>Podés abonar de dos maneras:</p>
+        <div class="pay-split">
+          <div class="pay-col">
+            <div class="pay-amount">
+              <svg class="flag" viewBox="0 0 30 20" aria-label="Argentina" role="img"><rect width="30" height="20" fill="#74acdf"/><rect y="6.67" width="30" height="6.67" fill="#fff"/><circle cx="15" cy="10" r="2.2" fill="#f6b40e"/></svg>
+              <span id="arsOut">$0</span>
+            </div>
+            <small>CBU/ALIAS</small>
+          </div>
+          <div class="pay-divider" aria-hidden="true"></div>
+          <div class="pay-col">
+            <div class="pay-amount">
+              <svg class="flag" viewBox="0 0 30 20" aria-label="Estados Unidos" role="img"><rect width="30" height="20" fill="#fff"/><g fill="#b22234"><rect width="30" height="1.54"/><rect y="3.08" width="30" height="1.54"/><rect y="6.15" width="30" height="1.54"/><rect y="9.23" width="30" height="1.54"/><rect y="12.31" width="30" height="1.54"/><rect y="15.38" width="30" height="1.54"/><rect y="18.46" width="30" height="1.54"/></g><rect width="12" height="10.77" fill="#3c3b6e"/></svg>
+              <span id="usdtOut">1 USD</span>
+            </div>
+            <small>USDT RED TRON</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="countdown" aria-live="off">Actualizamos cotización en <b id="cd">60</b> s</p>
+    <button class="btn" id="buyBtn">Comprar</button>
+
+    <div class="history" aria-live="polite">
+      <h3 class="display">Últimas transacciones</h3>
+      <div id="txList"><p class="tx-empty">Cargando historial…</p></div>
+      <button class="link more" id="moreBtn" hidden>Ver más</button>
+    </div>
+  </section>
+
+  <!-- PANTALLA 2: PAGO -->
+  <section class="screen" id="s-pay">
+    <h2 class="display">Elegí cómo pagar</h2>
+    <p class="sub">Vas a recibir <b id="paySats">0 sats</b> en tu billetera Lightning.</p>
+
+    <div class="methods" role="radiogroup" aria-label="Método de pago">
+      <button class="method on" data-m="cbu" role="radio" aria-checked="true"><strong>Pesos</strong><span>Transferencia a CBU</span></button>
+      <button class="method" data-m="usdt" role="radio" aria-checked="false"><strong>USDT</strong><span>Red Tron (TRC-20)</span></button>
+    </div>
+
+    <div class="paybox" id="paybox"></div>
+
+    <button class="btn dark" id="paidBtn">Ya pagué</button>
+    <button class="link" onclick="goHome()">Volver</button>
+  </section>
+
+  <!-- PANTALLA 3: ESPERA -->
+  <!-- PANTALLA 3: FACTURA LIGHTNING -->
+  <section class="screen" id="s-invoice">
+    <h2 class="display">Ahora pegá tu factura Lightning</h2>
+    <p class="sub">Abrí tu billetera, tocá “Recibir” y generá una factura por exactamente <b id="invSats"></b>. Copiala y pegala acá.</p>
+    <div class="field">
+      <label for="invoice">Factura Lightning</label>
+      <textarea id="invoice" rows="4" placeholder="lnbc..." autocomplete="off" spellcheck="false"></textarea>
+      <p class="inv-err" id="invErr" role="alert"></p>
+    </div>
+    <button class="btn dark" id="invBtn">Enviar factura</button>
+  </section>
+
+  <section class="screen" id="s-wait">
+    <div class="status">
+      <div class="spinner" id="statusIcon"></div>
+      <h2 class="display" id="statusTitle">Danos unos minutos, ya solicitamos el pago de tus satoshis</h2>
+      <p class="sub" id="statusSub"></p>
+      <div class="opcode">
+        <small>Tu código de operación</small>
+        <b id="opNum">…</b>
+        <span id="opHint">Guardalo: lo vas a necesitar si tenés algún problema con tu compra.</span>
+      </div>
+      <ol class="steps" id="steps">
+        <li class="done"><span class="dot">✓</span> Avisaste que pagaste</li>
+        <li class="done"><span class="dot">✓</span> Enviaste tu factura Lightning</li>
+        <li class="now"><span class="dot"></span> El vendedor verifica el pago</li>
+        <li><span class="dot"></span> Se envían los sats a tu billetera</li>
+      </ol>
+      <div class="thanks" id="thanks" hidden>
+        <p>Esta web no cobra comisiones, pero sí valoramos que nos sigas en nuestras redes.</p>
+        <div class="socials">
+          <!-- Reemplazar "#" por los links reales de Club Satoshi -->
+          <a class="social" href="#" target="_blank" rel="noopener">Instagram</a>
+          <a class="social" href="#" target="_blank" rel="noopener">X</a>
+          <a class="social" href="#" target="_blank" rel="noopener">YouTube</a>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- PANEL DE VENDEDORES -->
+  <section class="screen panel" id="s-seller">
+    <h2 class="display">Panel de vendedores</h2>
+    <p class="sub">Indicá tu horario, tu saldo disponible y tus datos de cobro. Acá te van a llegar los pedidos.</p>
+    <div id="sellerRoot"><p class="tx-empty">Cargando…</p></div>
+  </section>
+</main>
+<div class="alert-bar" id="alertBar" role="status" hidden></div>
+
+<section class="faq">
+  <h3 class="display">Preguntas frecuentes</h3>
+  <details><summary>¿Qué es un satoshi?</summary><p>Es la unidad más pequeña de Bitcoin. Un bitcoin tiene 100 millones de satoshis, así que podés comprar una partecita con muy poca plata.</p></details>
+  <details><summary>¿Quién me vende los sats?</summary><p>Miembros activos del Club Satoshi que ya conocés de las reuniones. Nadie más vende en esta página, así evitamos estafas.</p></details>
+  <details><summary>¿Por qué solo hasta 10 dólares?</summary><p>Esta página está pensada para dar el primer paso sin arriesgar mucho. Para montos más grandes, consultá en la comunidad.</p></details>
+  <details><summary>¿Qué necesito antes de comprar?</summary><p>Una billetera Lightning instalada en tu celular, por ejemplo Wallet of Satoshi, Blink o Phoenix. Ahí vas a recibir los sats.</p></details>
+  <details><summary>¿Cuánto tarda?</summary><p>Unos minutos. El vendedor recibe un aviso, verifica tu pago y te manda los sats por Lightning, que llegan al instante.</p></details>
+  <details><summary>No me llegaron los satoshis</summary><p>Comunicate con la comunidad del Club Satoshi e informá tu código de operación (por ejemplo, #0005) junto con el comprobante de tu transferencia. Con esos dos datos revisamos tu compra y lo resolvemos.</p></details>
+</section>
+
+<footer>
+  <span class="brand-mark">₿</span> <span>Una iniciativa de Club Satoshi. Aprendé Bitcoin desde cero con nosotros.</span>
+  <button class="seller-link" id="sellerToggle">Soy vendedor</button>
+</footer>
+
+<script>
+  // =====================================================================
+  //  CONEXIÓN — COMPLETAR ANTES DE USAR CON VARIAS PERSONAS
+  // =====================================================================
+  // 1) Pegá acá la configuración de tu proyecto de Firebase (ver README).
+  //    Si queda en null, la web funciona en MODO DEMO: los datos se guardan
+  //    solo en este navegador (sirve para probar comprador y vendedor en dos pestañas).
+  const FIREBASE_CONFIG = null;
+  /* Ejemplo:
+  const FIREBASE_CONFIG = {
+    apiKey: "...",
+    authDomain: "club-satoshi.firebaseapp.com",
+    projectId: "club-satoshi",
+    appId: "..."
+  };
+  */
+  // 2) Emails de quienes pueden habilitar vendedores (deben coincidir con firestore.rules).
+  const ADMIN_EMAILS = ["tu-email@gmail.com"];
+
+  // ---------- Modo demo: base de datos local con la misma forma que Firestore ----------
+  function createLocalStore() {
+    const KEY = "cs_demo_db";
+    const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };
+    const write = (data) => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} notify(); };
+    const listeners = new Set();
+    function notify() { listeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
+    window.addEventListener("storage", (e) => { if (e.key === KEY) notify(); });
+    const snapOf = (path, data) => ({ id: path.split("/").pop(), exists: data !== undefined, data: () => (data === undefined ? undefined : { ...data }) });
+    function doc(path) {
+      return {
+        id: path.split("/").pop(), path,
+        get: async () => snapOf(path, read()[path]),
+        set: async (d) => { const all = read(); all[path] = JSON.parse(JSON.stringify(d)); write(all); },
+        update: async (d) => { const all = read(); if (!all[path]) throw new Error("not found"); all[path] = { ...all[path], ...JSON.parse(JSON.stringify(d)) }; write(all); },
+        delete: async () => { const all = read(); delete all[path]; write(all); },
+        onSnapshot: (next) => { const fn = () => next(snapOf(path, read()[path])); listeners.add(fn); fn(); return () => listeners.delete(fn); },
+      };
+    }
+    function query(path, order, lim) {
+      const run = () => {
+        const all = read();
+        let docs = Object.keys(all).filter(k => k.startsWith(path + "/") && k.split("/").length === path.split("/").length + 1).map(k => snapOf(k, all[k]));
+        if (order) docs.sort((a, b) => { const x = a.data()[order.f], y = b.data()[order.f]; return (x > y ? 1 : x < y ? -1 : 0) * (order.d === "desc" ? -1 : 1); });
+        if (lim) docs = docs.slice(0, lim);
+        return { docs, size: docs.length, empty: !docs.length };
+      };
+      return {
+        orderBy: (f, d = "asc") => query(path, { f, d }, lim),
+        limit: (n) => query(path, order, n),
+        get: async () => run(),
+        doc: (id) => doc(path + "/" + id),
+        onSnapshot: (next) => { const fn = () => next(run()); listeners.add(fn); fn(); return () => listeners.delete(fn); },
+      };
+    }
+    return {
+      doc, collection: (path) => query(path),
+      // En modo demo no hay concurrencia real: alcanza con leer y sumar
+      async nextCode(build) {
+        const all = read();
+        const n = ((all["meta/contador"] && all["meta/contador"].ultimo) || 0) + 1;
+        all["meta/contador"] = { ultimo: n };
+        all["transacciones/" + String(n).padStart(4, "0")] = build(n);
+        write(all);
+        return n;
+      },
+    };
+  }
+
+  // ---------- Firebase: base de datos compartida entre todos ----------
+  function createFirebaseStore() {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    const fs = firebase.firestore();
+    return {
+      doc: (p) => fs.doc(p),
+      collection: (p) => fs.collection(p),
+      // Código correlativo con una transacción: dos compras nunca reciben el mismo número
+      async nextCode(build) {
+        return fs.runTransaction(async (t) => {
+          const cRef = fs.doc("meta/contador");
+          const c = await t.get(cRef);
+          const n = ((c.exists && c.data().ultimo) || 0) + 1;
+          t.set(cRef, { ultimo: n });
+          t.set(fs.doc("transacciones/" + String(n).padStart(4, "0")), build(n));
+          return n;
+        });
+      },
+    };
+  }
+  const DEMO = !FIREBASE_CONFIG || typeof firebase === "undefined";
+
+  // =====================================================================
+  //  CONFIGURACIÓN
+  // =====================================================================
+  let BTC_USD = 100000;          // precio de 1 BTC en dólares (fuente: Binance, par BTC/USDT)
+  let DOLAR_BLUE = 1200;         // dólar blue venta (fuente: CriptoYa)
+  const BLUE_RECARGO = 0.03;     // +3% sobre el dólar blue
+  let ARS_USD = DOLAR_BLUE * (1 + BLUE_RECARGO);  // pesos por dólar que paga el comprador
+  const SPREAD = 0.00;           // margen opcional de los vendedores (ej: 0.03 = 3%)
+  const TZ = "America/Argentina/Buenos_Aires";
+
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => Number(n).toLocaleString("es-AR");
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pad = (n) => String(n).padStart(4, "0");
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const fmtDate = (iso) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: TZ }) + " " +
+           d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
+  };
+
+  // Estado compartido (viene de la base de datos)
+  let db = null, myId = null, isAdmin = false;
+  // MODO PRUEBA: agrega un vendedor ficticio siempre online y simula su respuesta,
+  // para poder recorrer todas las pantallas. Poner en false antes de usarla de verdad.
+  const MODO_PRUEBA = true;
+  const VENDEDOR_PRUEBA = {
+    id: "prueba", nombre: "Vendedor", apellido: "Prueba",
+    cbu: "0000003100012345678901", alias: "club.satoshi.prueba",
+    usdt: "TPrueba1111111111111111111111111", liquidez: 1e9,
+    desde: "00:00", hasta: "00:00", activo: true,
+  };
+  const withTest = (list) => MODO_PRUEBA ? [...list.filter(v => v.id !== "prueba"), VENDEDOR_PRUEBA] : list;
+  let vendors = withTest([]);     // vendedores/{id}
+  let authorized = new Set(MODO_PRUEBA ? ["prueba"] : []);     // autorizados/{id}  (los habilita el administrador)
+  let allTx = [];                 // transacciones/{código}
+  let vendorsLoaded = false;
+
+  // Estado de la compra en curso
+  let amount = 1, method = "cbu", seller = null, lock = { sats: 0, ars: 0 };
+  let txUnsub = null;
+
+  // =====================================================================
+  //  VENDEDORES: horario, actividad y liquidez
+  // =====================================================================
+  function nowMinutesAR() {
+    const parts = new Intl.DateTimeFormat("es-AR", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+    return Number(parts.find(p => p.type === "hour").value) * 60 + Number(parts.find(p => p.type === "minute").value);
+  }
+  const toMin = (s) => { const [h, m] = String(s || "").split(":").map(Number); return h * 60 + (m || 0); };
+  function inSchedule(v) {
+    if (!v.desde || !v.hasta) return false;
+    const n = nowMinutesAR(), a = toMin(v.desde), b = toMin(v.hasta);
+    if (a === b) return true;                         // mismo horario = todo el día
+    return a < b ? (n >= a && n < b) : (n >= a || n < b);  // contempla horarios que cruzan la medianoche
+  }
+  const hasData = (v) => !!(v.nombre && v.apellido && v.cbu && v.alias && v.usdt);
+  const isOnline = (v) => authorized.has(v.id) && v.activo && hasData(v) && inSchedule(v);
+  // Sats ya comprometidos en pedidos que el vendedor todavía no terminó
+  const reserved = (id) => allTx.filter(t => t.vendedorId === id && (t.estado === "pendiente" || t.estado === "recibido")).reduce((s, t) => s + (t.sats || 0), 0);
+  const available = (v) => Math.max(0, (Number(v.liquidez) || 0) - reserved(v.id));
+  const onlineVendors = () => vendors.filter(isOnline);
+  const eligibleVendors = (sats) => onlineVendors().filter(v => available(v) >= sats);
+
+  // Rotación: el siguiente vendedor después del último asignado, solo entre los que tienen saldo suficiente
+  async function pickSeller(sats) {
+    const el = eligibleVendors(sats).sort((a, b) => (a.id < b.id ? -1 : 1));
+    if (!el.length) return null;
+    let last = "";
+    try { const snap = await db.doc("meta/turno").get(); last = snap.exists ? (snap.data().ultimo || "") : ""; } catch (e) {}
+    const next = el.find(v => v.id > last) || el[0];
+    try { await db.doc("meta/turno").set({ ultimo: next.id }); } catch (e) {}
+    return next;
+  }
+
+  // =====================================================================
+  //  COMPRADOR: pantalla principal
+  // =====================================================================
+  function showRate() { $("rateLabel").textContent = `1 BTC ≈ US$ ${fmt(BTC_USD)}`; }
+  showRate();
+
+  function showOnline() {
+    const n = onlineVendors().length;
+    const el = $("onlineLabel");
+    el.textContent = n === 0 ? "Sin vendedores online" : n === 1 ? "1 vendedor online" : `${n} vendedores online`;
+    el.classList.toggle("off", n === 0);
+  }
+
+  for (let i = 1; i <= 10; i++) {
+    const b = document.createElement("button");
+    b.className = "chip"; b.textContent = i;
+    b.onclick = () => { $("amount").value = i; update(); };
+    $("chips").appendChild(b);
+  }
+
+  function update() {
+    const raw = $("amount").value;
+    const v = Number(raw);
+    const valid = Number.isInteger(v) && v >= 1 && v <= 10;
+    amount = valid ? v : 0;
+    const sats = Math.floor(amount / BTC_USD * 1e8);
+    const ars = Math.ceil(amount * ARS_USD * (1 + SPREAD));
+
+    let msg = "Entre 1 y 10 dólares", err = false, canBuy = valid;
+    if (raw !== "" && !valid) { msg = "Elegí un monto entero entre 1 y 10 dólares"; err = true; }
+    else if (valid && vendorsLoaded) {
+      if (!onlineVendors().length) { msg = "No hay vendedores online en este momento. Probá más tarde."; err = true; canBuy = false; }
+      else if (!eligibleVendors(sats).length) { msg = "Ahora no hay saldo disponible para este monto. Probá con uno menor."; err = true; canBuy = false; }
+    }
+    $("hint").textContent = msg;
+    $("hint").classList.toggle("err", err);
+    $("buyBtn").disabled = !canBuy;
+    document.querySelectorAll(".chip").forEach((c, i) => c.classList.toggle("on", valid && i + 1 === v));
+    $("satsOut").textContent = fmt(sats);
+    $("arsOut").textContent = "$" + fmt(ars);
+    $("usdtOut").textContent = `${amount || 0} USD`;
+  }
+  $("amount").addEventListener("input", update);
+
+  function show(id) {
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+    $(id).classList.add("active");
+    document.body.classList.toggle("seller-mode", id === "s-seller");
+    $("sellerToggle").textContent = id === "s-seller" ? "Volver a la web" : "Soy vendedor";
+    window.scrollTo({ top: 0 });
+  }
+  function goHome() { show("s-amount"); }
+  function goBuyer() { if (txUnsub) { txUnsub(); txUnsub = null; } show("s-amount"); }
+
+  $("buyBtn").onclick = async () => {
+    if (!db) { $("hint").textContent = "La compra no está disponible en este momento."; $("hint").classList.add("err"); return; }
+    $("buyBtn").disabled = true;
+    lock = { sats: Math.floor(amount / BTC_USD * 1e8), ars: Math.ceil(amount * ARS_USD * (1 + SPREAD)) };
+    seller = await pickSeller(lock.sats);
+    $("buyBtn").disabled = false;
+    if (!seller) { update(); return; }
+    $("paySats").textContent = fmt(lock.sats) + " sats";
+    renderPaybox();
+    show("s-pay");
+  };
+
+  document.querySelectorAll(".method").forEach(b => b.onclick = () => {
+    method = b.dataset.m;
+    document.querySelectorAll(".method").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", x === b); });
+    renderPaybox();
+  });
+
+  function row(label, value, copy = true) {
+    return `<div class="row"><div><small>${label}</small><code>${esc(value)}</code></div>${copy ? `<button class="copy" data-v="${esc(value)}">Copiar</button>` : ""}</div>`;
+  }
+  function wireCopy(root) {
+    root.querySelectorAll(".copy").forEach(b => b.onclick = async () => {
+      try { await navigator.clipboard.writeText(b.dataset.v); } catch (e) {}
+      b.textContent = "Copiado"; b.classList.add("done");
+      setTimeout(() => { b.textContent = "Copiar"; b.classList.remove("done"); }, 1500);
+    });
+  }
+
+  function renderPaybox() {
+    const s = seller;
+    const ap = String(s.apellido || "");
+    const masked = ap.slice(-3).padStart(ap.length, "•");
+    let html;
+    if (method === "cbu") {
+      html = `<div class="total">Enviá exactamente<b>$${fmt(lock.ars)}</b></div>
+        ${row("Titular", `${s.nombre} ${masked}`, false)}
+        ${row("CBU", s.cbu)}
+        ${row("Alias", s.alias)}
+        <p class="warn">Al transferir, tu banco te va a mostrar el nombre completo. Verificá que coincida.</p>`;
+    } else {
+      html = `<div class="total">Enviá exactamente<b>${amount} USDT</b></div>
+        ${row("Dirección", s.usdt)}
+        ${row("Red", "Tron (TRC-20)", false)}
+        <p class="warn">Usá solo la red Tron (TRC-20). Si enviás por otra red, los fondos se pierden.</p>`;
+    }
+    $("paybox").innerHTML = html;
+    wireCopy($("paybox"));
+  }
+
+  // Paso 1: el comprador avisa que pagó → recién ahí le pedimos la factura
+  $("paidBtn").onclick = () => {
+    const btc = (lock.sats / 1e8).toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
+    $("invSats").textContent = `${fmt(lock.sats)} sats (${btc} BTC)`;
+    $("invoice").value = "";
+    $("invErr").textContent = "";
+    $("invoice").classList.remove("bad");
+    show("s-invoice");
+  };
+
+  // Lee el monto que trae una factura Lightning (BOLT11) y lo compara con el de la compra
+  function checkInvoice(raw) {
+    const s = raw.trim().toLowerCase().replace(/^lightning:/, "");
+    if (!s) return "Pegá la factura que generaste en tu billetera.";
+    if (/^ln(tb|tbs|bcrt)/.test(s)) return "Esa factura es de una red de prueba. Generá una factura de Bitcoin real.";
+    if (!/^lnbc[0-9a-z]+$/.test(s) || s.length < 90) return "Eso no parece una factura Lightning. Tiene que empezar con “lnbc”.";
+    const hrp = s.slice(0, s.lastIndexOf("1"));
+    const m = hrp.match(/^lnbc(\d*)([munp]?)$/);
+    if (!m) return "No pudimos leer la factura. Copiala de nuevo desde tu billetera.";
+    if (!m[1]) return `La factura no tiene monto. Generala por exactamente ${fmt(lock.sats)} sats.`;
+    const mult = { "": 1e8, m: 1e5, u: 100, n: 0.1, p: 0.0001 }[m[2]];
+    const sats = Number(m[1]) * mult;
+    if (Math.abs(sats - lock.sats) >= 1) return `La factura es por ${fmt(Math.round(sats))} sats, pero tu compra es de ${fmt(lock.sats)} sats. Generá una nueva por el monto correcto.`;
+    return null;
+  }
+
+  // Paso 2: con la factura correcta se crea la operación y se le avisa al vendedor
+  $("invBtn").onclick = async () => {
+    const err = checkInvoice($("invoice").value);
+    $("invErr").textContent = err || "";
+    $("invoice").classList.toggle("bad", !!err);
+    if (err) { $("invoice").focus(); return; }
+
+    $("invBtn").disabled = true;
+    const n = await createTx({
+      sats: lock.sats, vendedorId: seller.id, metodo: method,
+      ars: lock.ars, usdt: amount, invoice: $("invoice").value.trim().replace(/^lightning:/i, ""),
+    });
+    $("invBtn").disabled = false;
+    if (!n) { $("invErr").textContent = "No pudimos registrar la operación. Intentá de nuevo en unos segundos."; return; }
+
+
+    $("opNum").textContent = "#" + pad(n);
+    show("s-wait");
+    if (txUnsub) txUnsub();
+    txUnsub = db.doc("transacciones/" + pad(n)).onSnapshot(snap => { if (snap.exists) renderWait(snap.data()); });
+
+    // Modo prueba: el vendedor ficticio "confirma" solo el pago y el envío
+    if (seller.id === "prueba") {
+      const ref = db.doc("transacciones/" + pad(n));
+      setTimeout(() => ref.update({ estado: "recibido", recibido_at: new Date().toISOString() }).catch(() => {}), 4000);
+      setTimeout(() => ref.update({ estado: "completada", completada: new Date().toISOString() }).catch(() => {}), 8000);
+    }
+  };
+
+  // La pantalla de espera sigue en vivo lo que hace el vendedor desde su panel
+  function setStep(i, state) {
+    const li = $("steps").children[i];
+    li.className = state;
+    li.querySelector(".dot").textContent = state === "done" ? "✓" : "";
+  }
+  function renderWait(t) {
+    const name = (vendors.find(v => v.id === t.vendedorId) || {}).nombre || "el vendedor";
+    const sub = $("statusSub");
+    $("opHint").hidden = false;
+    $("thanks").hidden = true;
+    $("statusIcon").className = "spinner"; $("statusIcon").textContent = "";
+    if (t.estado === "pendiente") {
+      $("statusTitle").textContent = "Danos unos minutos, ya solicitamos el pago de tus satoshis";
+      sub.textContent = `Le avisamos a ${name}. Apenas confirme que llegó tu pago, te envía los sats.`;
+      setStep(2, "now"); setStep(3, "");
+    } else if (t.estado === "recibido") {
+      $("statusTitle").textContent = "Tu pago llegó, estamos enviando tus satoshis";
+      sub.textContent = `${name} confirmó tu pago y te está enviando los sats.`;
+      setStep(2, "done"); setStep(3, "now");
+    } else if (t.estado === "completada") {
+      $("statusIcon").className = "check"; $("statusIcon").textContent = "✓";
+      $("statusTitle").textContent = "¡Listo! Ya tenés tus sats";
+      sub.textContent = "Revisá tu billetera Lightning. Bienvenido a Bitcoin.";
+      setStep(2, "done"); setStep(3, "done");
+      $("opHint").hidden = true;
+      $("thanks").hidden = false;
+    } else if (t.estado === "rechazada") {
+      $("statusIcon").className = "check"; $("statusIcon").textContent = "!";
+      $("statusTitle").textContent = "No pudimos confirmar tu pago";
+      sub.textContent = `${name} no encontró tu transferencia. Comunicate con la comunidad, informá tu código de operación y adjuntá el comprobante.`;
+      setStep(2, ""); setStep(3, "");
+    }
+  }
+
+  // =====================================================================
+  //  HISTORIAL (solo operaciones completadas)
+  // =====================================================================
+  let showAll = false;
+  const completedTx = () => allTx.filter(t => !t.estado || t.estado === "completada");
+
+  function renderTx() {
+    const list = $("txList");
+    const txs = completedTx();
+    if (!db) { list.innerHTML = `<p class="tx-empty">El historial no está disponible en este momento.</p>`; $("moreBtn").hidden = true; return; }
+    if (!txs.length) { list.innerHTML = `<p class="tx-empty">Todavía no hay compras. ¡La primera puede ser la tuya!</p>`; $("moreBtn").hidden = true; return; }
+    const visible = showAll ? txs : txs.slice(0, 3);
+    list.innerHTML = visible.map(t =>
+      `<div class="tx"><span class="tx-code">#${pad(t.n)}</span><span class="tx-date">${fmtDate(t.fecha)}</span><span class="tx-sats">${fmt(t.sats)} sats</span></div>`
+    ).join("");
+    $("moreBtn").hidden = txs.length <= 3;
+    $("moreBtn").textContent = showAll ? "Ver menos" : `Ver más (${txs.length})`;
+  }
+  $("moreBtn").onclick = () => { showAll = !showAll; renderTx(); };
+
+  // Código de operación correlativo y único (turno sobre el contador)
+  async function createTx(extra) {
+    if (!db) return null;
+    try {
+      return await db.nextCode((n) => ({ n, fecha: new Date().toISOString(), estado: "pendiente", ...extra }));
+    } catch (e) { console.error("Error creando la operación", e); return null; }
+  }
+
+  // =====================================================================
+  //  PANEL DE VENDEDORES
+  // =====================================================================
+  let formFilled = false, seenOrders = null, rejectArm = null;
+  const me = () => vendors.find(v => v.id === myId) || null;
+
+  $("sellerToggle").onclick = () => {
+    if (document.body.classList.contains("seller-mode")) { goBuyer(); return; }
+    formFilled = false;
+    show("s-seller");
+    renderSeller();
+  };
+
+  function vendorStatus(v) {
+    if (!v || !hasData(v)) return { on: false, t: "Completá tus datos", s: "Sin datos de cobro no podés recibir pedidos." };
+    if (!authorized.has(v.id)) return { on: false, t: "Pendiente de habilitación", s: "El administrador tiene que habilitar tu cuenta." };
+    if (!v.activo) return { on: false, t: "Pausado", s: "Activá el interruptor para recibir pedidos." };
+    if (!inSchedule(v)) return { on: false, t: "Fuera de horario", s: `Tu horario es de ${v.desde} a ${v.hasta}.` };
+    return { on: true, t: "Online", s: `Recibís pedidos hasta las ${v.hasta}. Disponible: ${fmt(available(v))} sats.` };
+  }
+
+  function renderSeller() {
+    const root = $("sellerRoot");
+    if (!db) { root.innerHTML = `<div class="notice">El panel no está disponible en este momento.</div>`; return; }
+    if (!myId) {
+      root.innerHTML = `<div class="card"><h3>Ingresá con tu cuenta</h3><p>Usá tu cuenta de Google. Solo los vendedores habilitados por el administrador reciben pedidos.</p><button class="btn dark" id="loginBtn">Ingresar con Google</button><p class="form-msg err" id="loginMsg"></p></div>`;
+      $("loginBtn").onclick = async () => {
+        try { await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+        catch (e) { $("loginMsg").textContent = "No se pudo ingresar. Probá de nuevo."; }
+      };
+      return;
+    }
+    if (!root.querySelector("#sellerForm")) root.innerHTML = sellerSkeleton();
+    const v = me();
+    const st = vendorStatus(v);
+
+    $("authNotice").hidden = authorized.has(myId);
+    $("myIdText").textContent = myId;
+    $("stTitle").innerHTML = `<span class="st-dot ${st.on ? "on" : ""}"></span>${esc(st.t)}`;
+    $("stSub").textContent = st.s;
+    $("activeSwitch").checked = !!(v && v.activo);
+    $("liqMeta").textContent = v ? `Comprometido en pedidos: ${fmt(reserved(myId))} sats · Disponible: ${fmt(available(v))} sats` : "";
+
+    if (!formFilled) {
+      const d = v || {};
+      ["nombre", "apellido", "cbu", "alias", "usdt", "liquidez", "desde", "hasta"].forEach(k => { $("f_" + k).value = d[k] ?? (k === "desde" ? "09:00" : k === "hasta" ? "18:00" : ""); });
+      formFilled = true;
+    }
+    renderOrders();
+    renderAdmin();
+    if ($("logoutBtn")) $("logoutBtn").onclick = () => firebase.auth().signOut();
+  }
+
+  function sellerSkeleton() {
+    return `
+      ${DEMO ? `<div class="notice"><b>Modo demo:</b> los datos se guardan solo en este navegador. Abrí la web en otra pestaña para hacer de comprador.</div>` : ""}
+      <div class="notice" id="authNotice" hidden>Tu cuenta todavía no está habilitada como vendedor. Podés cargar tus datos igual; pedile al administrador que te habilite.<br><small>Tu ID: <code id="myIdText"></code></small></div>
+
+      <div class="card status-card">
+        <div><div class="st" id="stTitle"></div><div class="st-sub" id="stSub"></div></div>
+        <label class="switch" aria-label="Estoy activo"><input type="checkbox" id="activeSwitch"><span></span></label>
+      </div>
+
+      <h3 class="display" style="font-size:20px;margin:24px 0 10px">Pedidos</h3>
+      <div id="ordersList"></div>
+
+      <form class="card" id="sellerForm" novalidate>
+        <h3>Disponibilidad</h3>
+        <p>Solo vas a recibir pedidos dentro de este horario (hora de Argentina).</p>
+        <div class="grid2">
+          <div class="field"><label for="f_desde">Desde</label><input id="f_desde" type="time" required></div>
+          <div class="field"><label for="f_hasta">Hasta</label><input id="f_hasta" type="time" required></div>
+        </div>
+        <div class="field"><label for="f_liquidez">Satoshis disponibles para vender</label><input id="f_liquidez" type="number" inputmode="numeric" min="0" step="1" placeholder="Ej: 50000"></div>
+        <p class="liq-meta" id="liqMeta"></p>
+
+        <h3 style="margin-top:22px">Datos de cobro</h3>
+        <p>Es donde te van a pagar los compradores antes de que envíes los sats.</p>
+        <div class="grid2">
+          <div class="field"><label for="f_nombre">Nombre</label><input id="f_nombre" autocomplete="given-name"></div>
+          <div class="field"><label for="f_apellido">Apellido</label><input id="f_apellido" autocomplete="family-name"></div>
+        </div>
+        <div class="field"><label for="f_cbu">CBU / CVU</label><input id="f_cbu" inputmode="numeric" maxlength="22" placeholder="22 números"></div>
+        <div class="field"><label for="f_alias">Alias</label><input id="f_alias" autocapitalize="none" spellcheck="false"></div>
+        <div class="field"><label for="f_usdt">Dirección USDT (red Tron, TRC-20)</label><input id="f_usdt" autocapitalize="none" spellcheck="false" placeholder="Empieza con T"><small>Revisala bien: si está mal, el pago se pierde.</small></div>
+        <button class="btn dark" type="submit" id="saveBtn">Guardar cambios</button>
+        <p class="form-msg" id="formMsg" role="status"></p>
+      </form>
+
+      <div class="card mini-list">
+        <h3>Tus últimos envíos</h3>
+        <div id="myDone"></div>
+      </div>
+
+      <div class="card" id="adminCard" hidden>
+        <h3>Administración</h3>
+        <p>Habilitá a quién puede vender en la web.</p>
+        <div id="adminList"></div>
+      </div>
+      ${DEMO ? "" : `<button class="link" id="logoutBtn">Cerrar sesión</button>`}`;
+  }
+
+  async function saveVendor(patch) {
+    const base = { ...(me() || {}) }; delete base.id;
+    await db.doc("vendedores/" + myId).set({ ...base, ...patch, actualizado: new Date().toISOString() });
+  }
+
+  // Delegación de eventos del panel
+  document.addEventListener("change", async (e) => {
+    if (e.target.id !== "activeSwitch") return;
+    const on = e.target.checked;
+    if (on && !hasData({ ...(me() || {}), ...readForm() })) { e.target.checked = false; formMsg("Completá y guardá tus datos de cobro antes de activarte.", true); return; }
+    try { await saveVendor({ activo: on }); } catch (err) { e.target.checked = !on; formMsg("No se pudo cambiar tu estado. Probá de nuevo.", true); }
+  });
+
+  document.addEventListener("submit", async (e) => {
+    if (e.target.id !== "sellerForm") return;
+    e.preventDefault();
+    const f = readForm();
+    const problem = validateForm(f);
+    if (problem) { formMsg(problem, true); return; }
+    $("saveBtn").disabled = true;
+    try { await saveVendor({ ...f, liquidez: Number(f.liquidez) || 0, activo: (me() || {}).activo ?? false }); formMsg("Cambios guardados.", false); }
+    catch (err) { formMsg("No se pudieron guardar los cambios. Probá de nuevo.", true); }
+    $("saveBtn").disabled = false;
+  });
+
+  function readForm() {
+    const g = (k) => ($("f_" + k) ? $("f_" + k).value.trim() : "");
+    return { nombre: g("nombre"), apellido: g("apellido"), cbu: g("cbu").replace(/\s/g, ""), alias: g("alias"), usdt: g("usdt"), liquidez: g("liquidez"), desde: g("desde"), hasta: g("hasta") };
+  }
+  function validateForm(f) {
+    if (!f.desde || !f.hasta) return "Completá tu horario.";
+    if (!(Number(f.liquidez) >= 0) || !Number.isInteger(Number(f.liquidez))) return "Los satoshis disponibles tienen que ser un número entero.";
+    if (!f.nombre || !f.apellido) return "Completá tu nombre y apellido como figuran en tu cuenta.";
+    if (!/^\d{22}$/.test(f.cbu)) return "El CBU o CVU tiene que tener 22 números.";
+    if (!/^[a-zA-Z0-9.\-]{6,20}$/.test(f.alias)) return "El alias tiene que tener entre 6 y 20 caracteres (letras, números, puntos o guiones).";
+    if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(f.usdt)) return "La dirección USDT de Tron empieza con T y tiene 34 caracteres.";
+    return null;
+  }
+  function formMsg(t, isErr) { const m = $("formMsg"); if (!m) return; m.textContent = t; m.className = "form-msg " + (isErr ? "err" : "ok"); }
+
+  function renderOrders() {
+    const list = $("ordersList"); if (!list) return;
+    const mine = allTx.filter(t => t.vendedorId === myId && (t.estado === "pendiente" || t.estado === "recibido")).sort((a, b) => a.n - b.n);
+    if (!mine.length) { list.innerHTML = `<p class="tx-empty" style="border:0;padding:0 0 12px">No tenés pedidos pendientes. Cuando alguien te pague, aparece acá.</p>`; }
+    else list.innerHTML = mine.map(t => {
+      const pago = t.metodo === "usdt" ? `${fmt(t.usdt)} USDT por red Tron` : `$${fmt(t.ars)} por transferencia`;
+      if (t.estado === "pendiente") return `
+        <div class="order" data-n="${t.n}">
+          <div class="order-head"><b>#${pad(t.n)}</b><span>${fmtDate(t.fecha)}</span></div>
+          <span class="tag go">Verificá el pago</span>
+          <p>Te enviaron <b>${pago}</b>.</p>
+          <p>Tenés que enviar <b>${fmt(t.sats)} sats</b>.</p>
+          <div class="actions">
+            <button class="btn dark" data-act="recibido" data-n="${t.n}">Confirmar que recibí el pago</button>
+            <button class="btn ghost" data-act="rechazar" data-n="${t.n}">No me llegó el pago</button>
+          </div>
+        </div>`;
+      return `
+        <div class="order" data-n="${t.n}">
+          <div class="order-head"><b>#${pad(t.n)}</b><span>${fmtDate(t.fecha)}</span></div>
+          <span class="tag">Pago recibido</span>
+          <p>Pagá esta factura de <b>${fmt(t.sats)} sats</b> desde tu billetera:</p>
+          <div class="inv">${esc(t.invoice)}</div>
+          <div class="actions">
+            <button class="copy" data-v="${esc(t.invoice)}" style="align-self:flex-start">Copiar</button>
+            <button class="btn" data-act="enviado" data-n="${t.n}">Ya envié los sats</button>
+          </div>
+        </div>`;
+    }).join("");
+    wireCopy(list);
+
+    const done = allTx.filter(t => t.vendedorId === myId && t.estado === "completada").slice(0, 5);
+    $("myDone").innerHTML = done.length
+      ? done.map(t => `<div class="tx"><span class="tx-code">#${pad(t.n)}</span><span class="tx-date">${fmtDate(t.fecha)}</span><span class="tx-sats">${fmt(t.sats)} sats</span></div>`).join("")
+      : `<p class="tx-empty" style="border:0">Todavía no hiciste envíos.</p>`;
+  }
+
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-act]"); if (!b) return;
+    const n = Number(b.dataset.n), act = b.dataset.act;
+    const ref = db.doc("transacciones/" + pad(n));
+    const t = allTx.find(x => x.n === n); if (!t) return;
+    if (act === "rechazar" && rejectArm !== n) { rejectArm = n; b.textContent = "Tocá de nuevo para confirmar"; setTimeout(() => { if (rejectArm === n) { rejectArm = null; b.textContent = "No me llegó el pago"; } }, 4000); return; }
+    b.disabled = true;
+    try {
+      if (act === "recibido") await ref.update({ estado: "recibido", recibido_at: new Date().toISOString() });
+      if (act === "rechazar") { rejectArm = null; await ref.update({ estado: "rechazada", rechazada_at: new Date().toISOString() }); }
+      if (act === "enviado") {
+        await ref.update({ estado: "completada", completada: new Date().toISOString() });
+        const v = me(); if (v) await saveVendor({ liquidez: Math.max(0, (Number(v.liquidez) || 0) - (t.sats || 0)) });
+        formFilled = false;
+      }
+    } catch (err) { b.disabled = false; alertBar("No se pudo actualizar el pedido. Probá de nuevo."); }
+  });
+
+  // Aviso cuando entra un pedido nuevo (sonido, vibración y cartel)
+  function notifyNewOrders() {
+    if (!myId) return;
+    const pend = allTx.filter(t => t.vendedorId === myId && t.estado === "pendiente").map(t => t.n);
+    if (seenOrders === null) { seenOrders = new Set(pend); return; }
+    const fresh = pend.filter(n => !seenOrders.has(n));
+    pend.forEach(n => seenOrders.add(n));
+    if (!fresh.length) return;
+    const t = allTx.find(x => x.n === fresh[0]);
+    const pago = t.metodo === "usdt" ? `${fmt(t.usdt)} USDT` : `$${fmt(t.ars)}`;
+    alertBar(`Nuevo pedido #${pad(t.n)}: te enviaron ${pago} por ${fmt(t.sats)} sats`);
+    try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
+    beep();
+    if (!document.body.classList.contains("seller-mode")) { formFilled = false; show("s-seller"); renderSeller(); }
+    setTimeout(() => fresh.forEach(n => { const el = document.querySelector(`.order[data-n="${n}"]`); if (el) el.classList.add("new"); }), 50);
+  }
+  let alertTimer = null;
+  function alertBar(text) {
+    const a = $("alertBar"); a.textContent = text; a.hidden = false;
+    clearTimeout(alertTimer); alertTimer = setTimeout(() => { a.hidden = true; }, 6000);
+  }
+  function beep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.25].forEach(t0 => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+        g.gain.setValueAtTime(0.0001, ctx.currentTime + t0);
+        g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t0 + 0.2);
+        o.start(ctx.currentTime + t0); o.stop(ctx.currentTime + t0 + 0.22);
+      });
+    } catch (e) {}
+  }
+
+  // Administración: habilitar o deshabilitar vendedores (solo el dueño o editores)
+  function renderAdmin() {
+    const card = $("adminCard"); if (!card) return;
+    card.hidden = !isAdmin;
+    if (!isAdmin) return;
+    const realVendors = vendors.filter(v => v.id !== "prueba");
+    $("adminList").innerHTML = realVendors.length ? realVendors.map(v => `
+      <div class="admin-row">
+        <div><b>${esc(v.nombre || "Sin nombre")} ${esc(v.apellido || "")}</b><small>${esc(v.id)}</small></div>
+        <label class="switch" aria-label="Habilitar a ${esc(v.nombre || "vendedor")}"><input type="checkbox" data-auth="${esc(v.id)}" ${authorized.has(v.id) ? "checked" : ""}><span></span></label>
+      </div>`).join("") : `<p class="tx-empty" style="border:0">Todavía nadie cargó sus datos de vendedor.</p>`;
+  }
+  document.addEventListener("change", async (e) => {
+    const id = e.target.dataset && e.target.dataset.auth; if (!id) return;
+    try {
+      if (e.target.checked) await db.doc("autorizados/" + id).set({ habilitado: true, fecha: new Date().toISOString() });
+      else await db.doc("autorizados/" + id).delete();
+    } catch (err) { e.target.checked = !e.target.checked; alertBar("No tenés permiso para cambiar esto."); }
+  });
+
+  // =====================================================================
+  //  COTIZACIÓN: se actualiza cada 60 segundos
+  // =====================================================================
+  const QUOTE_SECONDS = 60;
+  let secsLeft = QUOTE_SECONDS;
+
+  // 1) Intenta tomar los precios en vivo de Binance y CriptoYa.
+  // 2) Si no puede (por ejemplo, dentro de claude.ai, que bloquea consultas a otros sitios), usa la última guardada.
+  async function fetchLive() {
+    const [b, c] = await Promise.all([
+      fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT").then(r => r.json()),
+      fetch("https://criptoya.com/api/dolar").then(r => r.json()),
+    ]);
+    const btc = Number(b && b.price);
+    const blue = Number(c && c.blue && (c.blue.ask ?? c.blue.venta));
+    if (!(btc > 0 && blue > 0)) throw new Error("Cotización incompleta");
+    return { btc, blue };
+  }
+  async function refreshQuote() {
+    let q = null;
+    try { q = await fetchLive(); } catch (e) { /* sin acceso directo: se usa la guardada */ }
+    if (!q && db) {
+      try {
+        const snap = await db.doc("meta/cotizacion").get();
+        const d = snap.exists ? snap.data() : null;
+        if (d && d.btc_usd > 0 && d.dolar_blue > 0) q = { btc: d.btc_usd, blue: d.dolar_blue };
+      } catch (e) { console.error("No se pudo leer la cotización guardada", e); }
+    }
+    if (q) {
+      BTC_USD = q.btc; DOLAR_BLUE = q.blue; ARS_USD = DOLAR_BLUE * (1 + BLUE_RECARGO);
+      showRate(); update();
+    }
+  }
+  setInterval(() => {
+    secsLeft--;
+    if (secsLeft <= 0) {
+      secsLeft = QUOTE_SECONDS;
+      refreshQuote();
+      showOnline(); update();                       // los horarios de los vendedores también se reevalúan
+      if (document.body.classList.contains("seller-mode")) renderSeller();
+    }
+    $("cd").textContent = secsLeft;
+  }, 1000);
+
+  // =====================================================================
+  //  INICIO: conexión con la base de datos compartida
+  // =====================================================================
+  function refreshAll() {
+    showOnline(); update(); renderTx();
+    notifyNewOrders();
+    if (document.body.classList.contains("seller-mode")) renderSeller();
+  }
+
+  function subscribeAll() {
+    db.collection("vendedores").onSnapshot(
+      snap => { vendors = withTest(snap.docs.map(d => ({ id: d.id, ...d.data() }))); vendorsLoaded = true; refreshAll(); },
+      () => { vendorsLoaded = true; refreshAll(); }
+    );
+    db.collection("autorizados").onSnapshot(snap => { authorized = new Set(snap.docs.map(d => d.id)); if (MODO_PRUEBA) authorized.add("prueba"); refreshAll(); });
+    db.collection("transacciones").orderBy("n", "desc").limit(500).onSnapshot(
+      snap => { allTx = snap.docs.map(d => d.data()); refreshAll(); },
+      (e) => { console.error(e); renderTx(); }
+    );
+  }
+
+  try {
+    if (DEMO) {
+      db = createLocalStore();
+      myId = "vendedor-demo"; isAdmin = true;
+    } else {
+      db = createFirebaseStore();
+      firebase.auth().onAuthStateChanged(u => {
+        myId = u ? u.uid : null;
+        isAdmin = !!(u && u.email && ADMIN_EMAILS.map(x => x.toLowerCase()).includes(u.email.toLowerCase()));
+        formFilled = false; seenOrders = null;
+        if ($("sellerRoot")) $("sellerRoot").innerHTML = "";
+        refreshAll();
+      });
+    }
+    subscribeAll();
+  } catch (e) { console.error("No se pudo conectar la base de datos", e); db = null; vendorsLoaded = true; refreshAll(); }
+
+  if (location.hash === "#vendedor") { show("s-seller"); renderSeller(); }
+  showOnline();
+  refreshQuote();
+  update();
+</script>
+</body>
+</html>
