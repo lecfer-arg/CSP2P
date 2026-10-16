@@ -25,6 +25,12 @@ service cloud.firestore {
       allow read: if true;
       allow create: if request.resource.data.estado == 'pendiente';
       allow update: if request.auth != null && request.auth.uid == resource.data.vendedorId;
+      // El comprador (sin cuenta) solo puede agregar UN comentario corto a una orden completada.
+      allow update: if resource.data.estado == 'completada'
+                    && !('comentario' in resource.data)
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comentario', 'comentario_at'])
+                    && request.resource.data.comentario is string
+                    && request.resource.data.comentario.size() <= 100;
     }
 
     // Contador de códigos y turno de la rotación.
