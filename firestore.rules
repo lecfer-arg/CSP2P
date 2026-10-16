@@ -4,7 +4,7 @@ service cloud.firestore {
 
     // Reemplazá por el/los email(s) de administrador (los mismos que en ADMIN_EMAILS del index.html)
     function isAdmin() {
-      return request.auth != null && request.auth.token.email in ['tu-email@gmail.com'];
+      return request.auth != null && request.auth.token.email in ['diegocorreadg@gmail.com'];
     }
 
     // Cada vendedor solo puede editar su propio perfil. Todos pueden leerlos (la web necesita los datos de cobro).

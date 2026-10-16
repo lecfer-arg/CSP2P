@@ -536,7 +536,14 @@
   // 1) Pegá acá la configuración de tu proyecto de Firebase (ver README).
   //    Si queda en null, la web funciona en MODO DEMO: los datos se guardan
   //    solo en este navegador (sirve para probar comprador y vendedor en dos pestañas).
-  const FIREBASE_CONFIG = null;
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDhALbQPrO-IVwdcQaR7_wv6E5XtCZpSIQ",
+    authDomain: "csp2p-609d0.firebaseapp.com",
+    projectId: "csp2p-609d0",
+    storageBucket: "csp2p-609d0.firebasestorage.app",
+    messagingSenderId: "371786920815",
+    appId: "1:371786920815:web:a0d3595d5de42496382e9a"
+  };
   /* Ejemplo:
   const FIREBASE_CONFIG = {
     apiKey: "...",
@@ -546,7 +553,7 @@
   };
   */
   // 2) Emails de quienes pueden habilitar vendedores (deben coincidir con firestore.rules).
-  const ADMIN_EMAILS = ["tu-email@gmail.com"];
+  const ADMIN_EMAILS = ["diegocorreadg@gmail.com"];
 
   // ---------- Modo demo: base de datos local con la misma forma que Firestore ----------
   function createLocalStore() {
@@ -645,7 +652,7 @@
   let db = null, myId = null, isAdmin = false;
   // MODO PRUEBA: agrega un vendedor ficticio siempre online y simula su respuesta,
   // para poder recorrer todas las pantallas. Poner en false antes de usarla de verdad.
-  const MODO_PRUEBA = true;
+  const MODO_PRUEBA = false;
   const VENDEDOR_PRUEBA = {
     id: "prueba", nombre: "Vendedor", apellido: "Prueba",
     cbu: "0000003100012345678901", alias: "club.satoshi.prueba",
