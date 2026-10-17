@@ -1291,15 +1291,21 @@
       const chars = "abcdefghijkmnpqrstuvwxyz23456789";
       const rnd = Array.from(crypto.getRandomValues(new Uint8Array(14)), b => chars[b % chars.length]).join("");
       $("f_ntfy").value = "cs-" + rnd;
-      formMsg("Canal generado. Tocá \"Guardar cambios\" y suscribite a ese canal en la app ntfy.", false);
+      try { await saveVendor({ ntfy: $("f_ntfy").value }); formMsg("Canal generado y guardado. Suscribite a ese canal en la app ntfy.", false); }
+      catch (err) { formMsg("Canal generado, pero no se pudo guardar. Tocá \"Guardar cambios\".", true); }
     }
     if (e.target.id === "ntfyTest") {
       const topic = $("f_ntfy").value.trim();
       if (!topic) { formMsg("Primero generá o escribí tu canal de avisos.", true); return; }
+      if (!/^[A-Za-z0-9_-]{8,64}$/.test(topic)) { formMsg("El canal de avisos tiene que tener entre 8 y 64 letras, números o guiones, sin espacios.", true); return; }
       e.target.disabled = true;
+      // Los compradores usan el canal GUARDADO: si el del campo es distinto, se guarda antes de probar
+      if ((me() || {}).ntfy !== topic) {
+        try { await saveVendor({ ntfy: topic }); } catch (err) { e.target.disabled = false; formMsg("No se pudo guardar el canal. Probá de nuevo.", true); return; }
+      }
       const ok = await sendPush({ ntfy: topic }, "Prueba de Club Satoshi", "Si ves esto, los avisos de pedidos te van a llegar al celular.");
       e.target.disabled = false;
-      formMsg(ok ? "Aviso enviado. Fijate si te llegó al celular." : "No se pudo enviar el aviso. Revisá el canal o tu conexión.", !ok);
+      formMsg(ok ? "Canal guardado y aviso enviado. Fijate si te llegó al celular." : "No se pudo enviar el aviso. Revisá el canal o tu conexión.", !ok);
     }
   });
 
