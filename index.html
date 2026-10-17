@@ -296,6 +296,8 @@
   .track input { width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 14px; font: 16px "Inter", sans-serif; text-align: center; color: var(--ink); background: var(--bg); }
   .track input:focus { border-color: var(--ink); outline: 0; }
   .renew { text-align: left; margin: 8px 0 0; }
+  .ntfy-row { display: flex; gap: 8px; align-items: center; }
+  .ntfy-row input { flex: 1; min-width: 0; }
   .wait-summary { margin: 14px 0 0; font-size: 15px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .renew .btn { margin-top: 10px; }
   .panel h2 { margin-bottom: 4px; }
@@ -933,6 +935,8 @@
 
     $("opNum").textContent = "#" + pad(n);
     currentTxN = n;
+    const pagoAviso = method === "usdt" ? `${amount} USDT por red Tron` : `$${fmt(lock.ars)} por transferencia`;
+    sendPush(seller, `Nuevo pedido #${pad(n)}`, `Te enviaron ${pagoAviso}. Tenés que enviar ${fmt(lock.sats)} Sats.`);
     $("commentText").value = ""; $("commentMsg").textContent = ""; updateCommentCount();
     show("s-wait");
     if (txUnsub) txUnsub();
@@ -997,6 +1001,15 @@
     }
   }
 
+  // Aviso al celular del vendedor por ntfy (app gratuita). Va como pedido simple, sin datos personales.
+  function sendPush(v, title, message) {
+    const topic = v && v.ntfy;
+    if (!topic || !/^[A-Za-z0-9_-]{8,64}$/.test(topic)) return Promise.resolve(false);
+    const panel = location.href.split("#")[0] + "#panel-cs";
+    const url = `https://ntfy.sh/${topic}?title=${encodeURIComponent(title)}&priority=high&tags=zap&click=${encodeURIComponent(panel)}`;
+    return fetch(url, { method: "POST", body: message }).then(r => r.ok).catch(() => false);
+  }
+
   // El comprador reemplaza una factura vencida (el pago ya estaba confirmado)
   $("renewBtn").onclick = async () => {
     const raw = $("renewInvoice").value;
@@ -1007,6 +1020,9 @@
     try {
       await db.doc("transacciones/" + pad(currentTxN)).update({ invoice: raw.trim().replace(/^lightning:/i, ""), estado: "recibido", factura_nueva_at: new Date().toISOString() });
       $("renewInvoice").value = "";
+      const tx = allTx.find(x => x.n === currentTxN);
+      const v = tx && vendors.find(x => x.id === tx.vendedorId);
+      sendPush(v, `Factura nueva #${pad(currentTxN)}`, "El comprador envió una factura nueva. Ya podés pagarla.");
     } catch (e) { $("renewErr").textContent = "No pudimos enviar la factura. Probá de nuevo."; }
     $("renewBtn").disabled = false;
   };
@@ -1164,7 +1180,7 @@
 
     if (!formFilled) {
       const d = v || {};
-      ["nombre", "apellido", "cbu", "alias", "usdt", "liquidez", "desde", "hasta"].forEach(k => { $("f_" + k).value = d[k] ?? (k === "desde" ? "09:00" : k === "hasta" ? "18:00" : ""); });
+      ["nombre", "apellido", "cbu", "alias", "usdt", "ntfy", "liquidez", "desde", "hasta"].forEach(k => { $("f_" + k).value = d[k] ?? (k === "desde" ? "09:00" : k === "hasta" ? "18:00" : ""); });
       formFilled = true;
     }
     renderOrders();
@@ -1204,6 +1220,13 @@
         <div class="field"><label for="f_cbu">CBU / CVU</label><input id="f_cbu" inputmode="numeric" maxlength="22" placeholder="22 números"></div>
         <div class="field"><label for="f_alias">Alias</label><input id="f_alias" autocapitalize="none" spellcheck="false"></div>
         <div class="field"><label for="f_usdt">Dirección USDT (red Tron, TRC-20)</label><input id="f_usdt" autocapitalize="none" spellcheck="false" placeholder="Empieza con T"><small>Revisala bien: si está mal, el pago se pierde.</small></div>
+
+        <h3 style="margin-top:22px">Avisos en el celular</h3>
+        <p>Para que te llegue un aviso aunque tengas el celular bloqueado: instalá la app gratuita <b>ntfy</b>, tocá "+" y suscribite al canal que figura acá abajo. Tratalo como una contraseña: no lo compartas.</p>
+        <div class="field"><label for="f_ntfy">Tu canal de avisos</label>
+          <div class="ntfy-row"><input id="f_ntfy" autocapitalize="none" spellcheck="false" placeholder="cs-…"><button class="copy" type="button" id="ntfyNew">Generar</button></div>
+          <small>Opcional. Guardá los cambios y después tocá "Probar aviso".</small></div>
+        <button class="btn" type="button" id="ntfyTest" style="margin-bottom:14px">Probar aviso</button>
         <button class="btn dark" type="submit" id="saveBtn">Guardar cambios</button>
         <p class="form-msg" id="formMsg" role="status"></p>
       </form>
@@ -1251,7 +1274,7 @@
 
   function readForm() {
     const g = (k) => ($("f_" + k) ? $("f_" + k).value.trim() : "");
-    return { nombre: g("nombre"), apellido: g("apellido"), cbu: g("cbu").replace(/\s/g, ""), alias: g("alias"), usdt: g("usdt"), liquidez: g("liquidez"), desde: g("desde"), hasta: g("hasta") };
+    return { nombre: g("nombre"), apellido: g("apellido"), cbu: g("cbu").replace(/\s/g, ""), alias: g("alias"), usdt: g("usdt"), ntfy: g("ntfy"), liquidez: g("liquidez"), desde: g("desde"), hasta: g("hasta") };
   }
   function validateForm(f) {
     if (!f.desde || !f.hasta) return "Completá tu horario.";
@@ -1260,8 +1283,26 @@
     if (!/^\d{22}$/.test(f.cbu)) return "El CBU o CVU tiene que tener 22 números.";
     if (!/^[a-zA-Z0-9.\-]{6,20}$/.test(f.alias)) return "El alias tiene que tener entre 6 y 20 caracteres (letras, números, puntos o guiones).";
     if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(f.usdt)) return "La dirección USDT de Tron empieza con T y tiene 34 caracteres.";
+    if (f.ntfy && !/^[A-Za-z0-9_-]{8,64}$/.test(f.ntfy)) return "El canal de avisos tiene que tener entre 8 y 64 letras, números o guiones, sin espacios.";
     return null;
   }
+  document.addEventListener("click", async (e) => {
+    if (e.target.id === "ntfyNew") {
+      const chars = "abcdefghijkmnpqrstuvwxyz23456789";
+      const rnd = Array.from(crypto.getRandomValues(new Uint8Array(14)), b => chars[b % chars.length]).join("");
+      $("f_ntfy").value = "cs-" + rnd;
+      formMsg("Canal generado. Tocá \"Guardar cambios\" y suscribite a ese canal en la app ntfy.", false);
+    }
+    if (e.target.id === "ntfyTest") {
+      const topic = $("f_ntfy").value.trim();
+      if (!topic) { formMsg("Primero generá o escribí tu canal de avisos.", true); return; }
+      e.target.disabled = true;
+      const ok = await sendPush({ ntfy: topic }, "Prueba de Club Satoshi", "Si ves esto, los avisos de pedidos te van a llegar al celular.");
+      e.target.disabled = false;
+      formMsg(ok ? "Aviso enviado. Fijate si te llegó al celular." : "No se pudo enviar el aviso. Revisá el canal o tu conexión.", !ok);
+    }
+  });
+
   function formMsg(t, isErr) { const m = $("formMsg"); if (!m) return; m.textContent = t; m.className = "form-msg " + (isErr ? "err" : "ok"); }
 
   function renderOrders() {
