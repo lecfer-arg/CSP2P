@@ -1138,7 +1138,7 @@
   // =====================================================================
   //  PANEL DE VENDEDORES
   // =====================================================================
-  let formFilled = false, seenOrders = null, rejectArm = null;
+  let formFilled = false, formHadData = false, formDirty = false, seenOrders = null, rejectArm = null;
   const me = () => vendors.find(v => v.id === myId) || null;
 
   $("sellerToggle").onclick = () => {
@@ -1178,10 +1178,12 @@
     $("activeSwitch").checked = !!(v && v.activo);
     $("liqMeta").textContent = v ? `Comprometido en pedidos: ${fmt(reserved(myId))} Sats · Disponible: ${fmt(available(v))} Sats` : "";
 
-    if (!formFilled) {
+    // El formulario se completa recién cuando llegaron los datos de la base.
+    // Si se completó vacío y después llegan tus datos (y no tocaste nada), se vuelve a completar.
+    if (vendorsLoaded && (!formFilled || (!formHadData && v && !formDirty))) {
       const d = v || {};
       ["nombre", "apellido", "cbu", "alias", "usdt", "ntfy", "liquidez", "desde", "hasta"].forEach(k => { $("f_" + k).value = d[k] ?? (k === "desde" ? "09:00" : k === "hasta" ? "18:00" : ""); });
-      formFilled = true;
+      formFilled = true; formHadData = !!v; formDirty = false;
     }
     renderOrders();
     renderAdmin();
@@ -1308,6 +1310,8 @@
       formMsg(ok ? "Canal guardado y aviso enviado. Fijate si te llegó al celular." : "No se pudo enviar el aviso. Revisá el canal o tu conexión.", !ok);
     }
   });
+
+  document.addEventListener("input", (e) => { if (e.target.closest && e.target.closest("#sellerForm")) formDirty = true; });
 
   function formMsg(t, isErr) { const m = $("formMsg"); if (!m) return; m.textContent = t; m.className = "form-msg " + (isErr ? "err" : "ok"); }
 
@@ -1548,7 +1552,7 @@
       firebase.auth().onAuthStateChanged(u => {
         myId = u ? u.uid : null;
         isAdmin = !!(u && u.email && ADMIN_EMAILS.map(x => x.toLowerCase()).includes(u.email.toLowerCase()));
-        formFilled = false; seenOrders = null;
+        formFilled = false; formHadData = false; formDirty = false; seenOrders = null;
         if ($("sellerRoot")) $("sellerRoot").innerHTML = "";
         refreshAll();
       });
