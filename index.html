@@ -1232,6 +1232,7 @@
     }
     renderOrders();
     renderAdmin();
+    syncAdminTopic();
     if ($("logoutBtn")) $("logoutBtn").onclick = () => firebase.auth().signOut();
   }
 
@@ -1296,7 +1297,12 @@
 
   async function saveVendor(patch) {
     const base = { ...(me() || {}) }; delete base.id;
-    await db.doc("vendedores/" + myId).set({ ...base, ...patch, actualizado: new Date().toISOString() });
+    const next = { ...base, ...patch, actualizado: new Date().toISOString() };
+    await db.doc("vendedores/" + myId).set(next);
+    // Vendedor nuevo que completa sus datos por primera vez: aviso al administrador
+    if (!isAdmin && !hasData(base) && hasData(next) && adminTopic) {
+      sendPush({ ntfy: adminTopic }, "Nuevo vendedor", `${next.nombre} ${next.apellido} cargó sus datos de vendedor. Entrá a Administración para revisarlo y habilitarlo.`);
+    }
   }
 
   // Delegación de eventos del panel
@@ -1576,7 +1582,19 @@
     if (document.body.classList.contains("seller-mode")) renderSeller();
   }
 
+  // Canal de avisos del administrador (lo guarda el propio panel del admin)
+  let adminTopic = null, adminTopicSaving = null;
+  function syncAdminTopic() {
+    if (!isAdmin || !db) return;
+    const t = (me() || {}).ntfy;
+    if (t && t !== adminTopic && t !== adminTopicSaving) {
+      adminTopicSaving = t;
+      db.doc("meta/admin").set({ ntfy: t }).catch(() => {}).finally(() => { adminTopicSaving = null; });
+    }
+  }
+
   function subscribeAll() {
+    db.doc("meta/admin").onSnapshot(snap => { adminTopic = snap.exists ? (snap.data().ntfy || null) : null; });
     db.collection("vendedores").onSnapshot(
       snap => { vendors = withTest(snap.docs.map(d => ({ id: d.id, ...d.data() }))); vendorsLoaded = true; refreshAll(); },
       () => { vendorsLoaded = true; refreshAll(); }
