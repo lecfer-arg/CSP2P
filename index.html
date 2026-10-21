@@ -223,6 +223,10 @@
   .check { width: 64px; height: 64px; border-radius: 50%; background: var(--orange); margin: 0 auto 24px; display: grid; place-items: center; font-size: 32px; font-weight: 800; }
   .steps { list-style: none; padding: 0; margin: 28px 0; text-align: left; }
   .steps li { display: flex; gap: 12px; align-items: center; padding: 10px 0; color: var(--muted); }
+  .steps li { align-items: flex-start; }
+  .step-txt { display: flex; flex-direction: column; padding-top: 1px; }
+  .step-sub:empty { display: none; }
+  .step-sub { font-size: 13px; font-style: italic; font-weight: 400; color: var(--muted); }
   .steps li .dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); flex-shrink: 0; display: grid; place-items: center; font-size: 12px; }
   .steps li.done { color: var(--ink); }
   .steps li.done .dot { background: var(--orange); border-color: var(--orange); color: #fff; }
@@ -305,6 +309,8 @@
   .track input { width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 14px; font: 16px "Inter", sans-serif; text-align: center; color: var(--ink); background: var(--bg); }
   .track input:focus { border-color: var(--ink); outline: 0; }
   .renew { text-align: left; margin: 8px 0 0; }
+  .reject-box { display: grid; gap: 10px; margin: 8px 0 0; }
+  .reject-box[hidden] { display: none; }
   .confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
   .ntfy-row { display: flex; gap: 8px; align-items: center; }
   .ntfy-row input { flex: 1; min-width: 0; }
@@ -509,11 +515,16 @@
         <p class="inv-err" id="renewErr" role="alert"></p>
         <button class="btn dark" id="renewBtn" type="button">Enviar nueva factura</button>
       </div>
+      <div class="reject-box" id="rejectBox" hidden>
+        <button class="btn dark" id="sentAgainBtn" type="button">Transferencia enviada</button>
+        <button class="btn ghost" id="cancelOpBtn" type="button">Cancelar operación</button>
+        <p class="inv-err" id="rejectErr" role="alert"></p>
+      </div>
       <ol class="steps" id="steps">
-        <li class="done"><span class="dot">✓</span> Avisaste que pagaste.</li>
-        <li class="done"><span class="dot">✓</span> Enviaste tu factura Lightning.</li>
-        <li class="now"><span class="dot"></span> El vendedor verifica el pago.</li>
-        <li><span class="dot"></span> Se envían los Sats a tu billetera.</li>
+        <li class="done"><span class="dot">✓</span><span class="step-txt">Avisaste del pago.<small class="step-sub" id="stepSub0"></small></span></li>
+        <li class="done"><span class="dot">✓</span><span class="step-txt">Enviaste tu factura Lightning.<small class="step-sub" id="stepSub1"></small></span></li>
+        <li class="now"><span class="dot"></span><span class="step-txt">El vendedor verifica el pago.<small class="step-sub" id="stepSub2"></small></span></li>
+        <li><span class="dot"></span><span class="step-txt">Se envían los Sats.<small class="step-sub" id="stepSub3"></small></span></li>
       </ol>
       <div class="thanks" id="thanks" hidden>
         <div class="comment" id="commentBox">
@@ -823,6 +834,25 @@
     $("faqToggle").setAttribute("aria-expanded", String(!faqFold));
     $("sellerToggle").hidden = id !== "s-seller";   // el acceso al panel no se muestra en la web pública
     window.scrollTo({ top: 0 });
+    // Recordamos el pedido abierto para que, si el comprador actualiza la página, vuelva a la misma pantalla
+    rememberOrder(id === "s-wait" ? currentTxN : null);
+  }
+  const ORDER_KEY = "cs_pedido_activo";
+  function rememberOrder(n) {
+    try { if (n) localStorage.setItem(ORDER_KEY, String(n)); else localStorage.removeItem(ORDER_KEY); } catch (e) {}
+  }
+  async function restoreOrder() {
+    let n = 0;
+    try { n = Number(localStorage.getItem(ORDER_KEY)) || 0; } catch (e) {}
+    if (!n || !db) return;
+    document.body.style.visibility = "hidden";   // evita que se vea la portada un instante
+    const reveal = setTimeout(() => { document.body.style.visibility = ""; }, 3000);
+    try {
+      const snap = await db.doc("transacciones/" + pad(n)).get();
+      if (document.body.classList.contains("seller-mode")) return;
+      if (snap.exists) openOrder(n, snap.data()); else rememberOrder(null);
+    } catch (e) {}
+    finally { clearTimeout(reveal); document.body.style.visibility = ""; }
   }
   function goHome() { show("s-amount"); }
   function goBuyer() {
@@ -982,10 +1012,17 @@
     $("thanks").hidden = true;
     $("statusIcon").className = "spinner"; $("statusIcon").textContent = "";
     $("renewBox").hidden = true;
+    $("rejectBox").hidden = true;
+    if (t.estado !== "rechazada") { cancelArm = false; $("cancelOpBtn").textContent = "Cancelar operación"; $("rejectErr").textContent = ""; }
     // Resumen fijo de la operación, para que no haya dudas de lo que se pagó y lo que se recibe
     const pagado = t.metodo === "usdt" ? `${fmt(t.usdt)} USDT` : `$${fmt(t.ars)}`;
     $("waitSummary").textContent = `Transferiste ${pagado} · Vas a recibir ${fmt(t.sats)} Sats`;
-    $("waitSummary").hidden = t.estado === "completada";   // al terminar, el título ya dice cuántos Sats se enviaron
+    $("waitSummary").hidden = t.estado === "completada";
+    // Detalle de lo que hizo el comprador, debajo de los dos primeros pasos
+    $("stepSub0").textContent = t.metodo === "usdt" ? `Enviaste ${fmt(t.usdt)} USDT` : `$${fmt(t.ars)} ARS`;
+    $("stepSub1").textContent = `${fmt(t.sats)} Sats`;
+    $("stepSub2").textContent = ["recibido", "vencida", "completada"].includes(t.estado) ? "Recibido" : "";
+    $("stepSub3").textContent = t.estado === "completada" ? "Revisá tu billetera Lightning" : "";   // al terminar, el título ya dice cuántos Sats se enviaron
     lock = { ...lock, sats: t.sats };          // para revisar el monto de una factura nueva
     if (t.estado === "vencida") {
       const btc = (t.sats / 1e8).toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
@@ -997,8 +1034,8 @@
       return;
     }
     if (t.estado === "pendiente") {
-      $("statusTitle").textContent = "Danos unos minutos, ya solicitamos el pago de tus Satoshis";
-      sub.textContent = `Le avisamos a ${name}. Apenas confirme que llegó tu pago, te envía los Sats.`;
+      $("statusTitle").textContent = t.reclamado ? "Le avisamos al vendedor que ya enviaste la transferencia" : "Danos unos minutos, ya solicitamos el pago de tus Satoshis";
+      sub.textContent = t.reclamado ? `${name} va a revisar de nuevo si llegó tu pago.` : `Le avisamos a ${name}. Apenas confirme que llegó tu pago, te envía los Sats.`;
       setStep(2, "now"); setStep(3, "");
     } else if (t.estado === "recibido") {
       $("statusTitle").textContent = "Tu pago llegó, estamos enviando tus Satoshis";
@@ -1016,10 +1053,48 @@
       $("commentDone").hidden = !t.comentario;
     } else if (t.estado === "rechazada") {
       $("statusIcon").className = "check"; $("statusIcon").textContent = "!";
-      $("statusTitle").textContent = "No pudimos confirmar tu pago";
-      sub.textContent = `${name} no encontró tu transferencia. Comunicate con la comunidad, informá tu código de operación y adjuntá el comprobante.`;
+      $("rejectBox").hidden = false;
+      if (!t.reclamado) {
+        // Primera vez: el comprador puede avisar que sí transfirió o cancelar
+        $("statusTitle").textContent = "El vendedor informa que el pago no llegó";
+        sub.textContent = "Por favor, controlá que se haya enviado correctamente.";
+        $("sentAgainBtn").hidden = false;
+      } else {
+        // Ya avisó una vez y el vendedor sigue sin verlo: lo resuelve la comunidad
+        $("statusTitle").textContent = "No pudimos confirmar tu pago";
+        sub.textContent = `${name} sigue sin encontrar tu transferencia. Comunicate con la comunidad, informá tu código de operación y adjuntá el comprobante.`;
+        $("sentAgainBtn").hidden = true;
+      }
+      setStep(2, ""); setStep(3, "");
+    } else if (t.estado === "cancelada") {
+      $("statusIcon").className = "check"; $("statusIcon").textContent = "×";
+      $("statusTitle").textContent = "Cancelaste la operación";
+      sub.textContent = "Si ya habías transferido, comunicate con la comunidad Club Satoshi con tu código de operación y el comprobante.";
+      $("waitSummary").hidden = true;
       setStep(2, ""); setStep(3, "");
     }
+  }
+
+  // Cuando el vendedor dice que no llegó el pago, el comprador avisa que sí lo envió o cancela
+  let cancelArm = false;
+  $("sentAgainBtn").onclick = async () => {
+    if (!db || !currentTxN) return;
+    $("sentAgainBtn").disabled = true; $("rejectErr").textContent = "";
+    try {
+      await db.doc("transacciones/" + pad(currentTxN)).update({ estado: "pendiente", reclamado: true, reclamo_at: new Date().toISOString() });
+      const tx = allTx.find(x => x.n === currentTxN);
+      const v = tx && vendors.find(x => x.id === tx.vendedorId);
+      sendPush(v, `Revisá de nuevo #${pad(currentTxN)}`, "El comprador dice que la transferencia fue enviada. Verificá el pago otra vez.");
+    } catch (e) { $("rejectErr").textContent = "No pudimos enviar el aviso. Probá de nuevo."; }
+    $("sentAgainBtn").disabled = false;
+  };
+  $("cancelOpBtn").onclick = async () => {
+    if (!db || !currentTxN) return;
+    if (!cancelArm) { cancelArm = true; $("cancelOpBtn").textContent = "Tocá de nuevo para confirmar"; return; }
+    $("cancelOpBtn").disabled = true; $("rejectErr").textContent = "";
+    try { await db.doc("transacciones/" + pad(currentTxN)).update({ estado: "cancelada", cancelada_at: new Date().toISOString() }); }
+    catch (e) { $("rejectErr").textContent = "No pudimos cancelar la operación. Probá de nuevo."; }
+    $("cancelOpBtn").disabled = false;
   }
 
   // Aviso al celular del vendedor por ntfy (app gratuita). Va como pedido simple, sin datos personales.
@@ -1389,7 +1464,8 @@
       if (t.estado === "pendiente") return `
         <div class="order" data-n="${t.n}">
           <div class="order-head"><b>#${pad(t.n)}</b><span>${fmtDate(t.fecha)}</span></div>
-          <span class="tag go">Verificá el pago</span>
+          <span class="tag go">${t.reclamado ? "El comprador dice que ya transfirió" : "Verificá el pago"}</span>
+          ${t.reclamado ? `<p>Antes marcaste que no llegó. Revisá de nuevo tu cuenta.</p>` : ""}
           <p>Te enviaron <b>${pago}</b>.</p>
           <p>Tenés que enviar <b>${fmt(t.sats)} Sats</b>.</p>
           <div class="actions">
@@ -1429,6 +1505,7 @@
     completada: { t: "Completada", c: "st-ok" },
     rechazada: { t: "Rechazada: no llegó el pago", c: "st-rej" },
     vencida: { t: "Factura vencida, esperando una nueva", c: "st-pend" },
+    cancelada: { t: "Cancelada por el comprador", c: "st-rej" },
   };
   let histLimit = 20;
   function renderHistory() {
@@ -1491,12 +1568,13 @@
       const nw = renewed.filter(k => !seenRenew.has(k)); nw.forEach(k => seenRenew.add(k));
       if (nw.length) { alertBar(`Pedido #${pad(Number(nw[0].split("|")[0]))}: el comprador envió una factura nueva`); beep(); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} }
     }
-    const pend = allTx.filter(t => t.vendedorId === myId && t.estado === "pendiente").map(t => t.n);
+    const pend = allTx.filter(t => t.vendedorId === myId && t.estado === "pendiente").map(t => t.n + "|" + (t.reclamo_at || ""));
     if (seenOrders === null) { seenOrders = new Set(pend); return; }
-    const fresh = pend.filter(n => !seenOrders.has(n));
-    pend.forEach(n => seenOrders.add(n));
+    const fresh = pend.filter(k => !seenOrders.has(k));
+    pend.forEach(k => seenOrders.add(k));
     if (!fresh.length) return;
-    const t = allTx.find(x => x.n === fresh[0]);
+    const t = allTx.find(x => x.n === Number(fresh[0].split("|")[0]));
+    if (t.reclamo_at) { alertBar(`Pedido #${pad(t.n)}: el comprador dice que ya transfirió`); beep(); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} return; }
     const pago = t.metodo === "usdt" ? `${fmt(t.usdt)} USDT` : `$${fmt(t.ars)}`;
     alertBar(`Nuevo pedido #${pad(t.n)}: te enviaron ${pago} por ${fmt(t.sats)} Sats`);
     try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
@@ -1644,6 +1722,7 @@
   }
   window.addEventListener("hashchange", openPanelFromHash);
   openPanelFromHash();
+  if (location.hash !== "#" + PANEL_SECRETO) restoreOrder();
   showOnline();
   refreshQuote();
   update();
