@@ -357,6 +357,7 @@
   .order .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
   .order .btn { padding: 14px; font-size: 16px; }
   .btn.ghost { background: var(--bg); color: #c0392b; border: 1.5px solid #f0c8c3; }
+  .btn.ghost.armed { background: #d62d20; color: #fff; border-color: #d62d20; font-weight: 800; }
   .alert-bar { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 12px); z-index: 10; width: max-content; max-width: calc(100% - 24px); background: var(--ink); color: #fff; border-radius: 16px; padding: 10px 18px; font-weight: 600; font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.2); }
   .alert-bar[hidden] { display: none; }
   .hrow summary { display: grid; grid-template-columns: auto auto 1fr auto auto; gap: 10px; align-items: center; padding: 12px 0; font-weight: 500; font-size: 15px; color: var(--ink); }
@@ -1470,7 +1471,7 @@
           <p>Tenés que enviar <b>${fmt(t.sats)} Sats</b>.</p>
           <div class="actions">
             <button class="btn dark" data-act="recibido" data-n="${t.n}">Confirmar que recibí el pago</button>
-            <button class="btn ghost" data-act="rechazar" data-n="${t.n}">No me llegó el pago</button>
+            <button class="btn ghost${rejectArm === t.n ? " armed" : ""}" data-act="rechazar" data-n="${t.n}">${rejectArm === t.n ? "TOCÁ DE NUEVO PARA CONFIRMAR" : "No me llegó el pago"}</button>
           </div>
         </div>`;
       if (t.estado === "vencida") return `
@@ -1544,7 +1545,7 @@
     const n = Number(b.dataset.n), act = b.dataset.act;
     const ref = db.doc("transacciones/" + pad(n));
     const t = allTx.find(x => x.n === n); if (!t) return;
-    if (act === "rechazar" && rejectArm !== n) { rejectArm = n; b.textContent = "Tocá de nuevo para confirmar"; setTimeout(() => { if (rejectArm === n) { rejectArm = null; b.textContent = "No me llegó el pago"; } }, 4000); return; }
+    if (act === "rechazar" && rejectArm !== n) { rejectArm = n; b.textContent = "TOCÁ DE NUEVO PARA CONFIRMAR"; b.classList.add("armed"); setTimeout(() => { if (rejectArm === n) { rejectArm = null; renderOrders(); } }, 8000); return; }
     b.disabled = true;
     try {
       if (act === "recibido") await ref.update({ estado: "recibido", recibido_at: new Date().toISOString() });
