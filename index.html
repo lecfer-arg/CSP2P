@@ -508,7 +508,7 @@
         <b id="opNum">…</b>
         <span id="opHint">Guardalo: lo vas a necesitar si tenés algún problema con tu compra.</span>
       </div>
-      <p class="wait-summary" id="waitSummary"></p>
+      <p class="wait-summary" id="waitSummary" hidden></p>
       <div class="field renew" id="renewBox" hidden>
         <label for="renewInvoice">Nueva factura Lightning</label>
         <textarea id="renewInvoice" rows="4" placeholder="lnbc..." autocomplete="off" spellcheck="false"></textarea>
@@ -1017,7 +1017,7 @@
     // Resumen fijo de la operación, para que no haya dudas de lo que se pagó y lo que se recibe
     const pagado = t.metodo === "usdt" ? `${fmt(t.usdt)} USDT` : `$${fmt(t.ars)}`;
     $("waitSummary").textContent = `Transferiste ${pagado} · Vas a recibir ${fmt(t.sats)} Sats`;
-    $("waitSummary").hidden = t.estado === "completada";
+    $("waitSummary").hidden = true;   // el monto ya se ve debajo de los pasos
     // Detalle de lo que hizo el comprador, debajo de los dos primeros pasos
     $("stepSub0").textContent = t.metodo === "usdt" ? `Enviaste ${fmt(t.usdt)} USDT` : `$${fmt(t.ars)} ARS`;
     $("stepSub1").textContent = `${fmt(t.sats)} Sats`;
