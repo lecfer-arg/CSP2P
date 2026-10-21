@@ -31,6 +31,16 @@ service cloud.firestore {
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['invoice', 'estado', 'factura_nueva_at'])
                     && request.resource.data.invoice is string
                     && request.resource.data.invoice.size() < 2000;
+      // Si el vendedor marcó que no llegó el pago, el comprador puede avisar UNA vez que sí lo envió...
+      allow update: if resource.data.estado == 'rechazada'
+                    && !('reclamado' in resource.data)
+                    && request.resource.data.estado == 'pendiente'
+                    && request.resource.data.reclamado == true
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'reclamado', 'reclamo_at']);
+      // ...o cancelar la operación.
+      allow update: if resource.data.estado == 'rechazada'
+                    && request.resource.data.estado == 'cancelada'
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'cancelada_at']);
       // El comprador (sin cuenta) solo puede agregar UN comentario corto a una orden completada.
       allow update: if resource.data.estado == 'completada'
                     && !('comentario' in resource.data)
@@ -42,7 +52,7 @@ service cloud.firestore {
     // Contador de códigos y turno de la rotación.
     match /meta/{docId} {
       allow read: if true;
-      allow write: if docId in ['contador', 'turno'];
+      allow write: if docId in ['contador', 'turno'] || (docId == 'admin' && isAdmin());
     }
   }
 }
